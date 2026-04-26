@@ -10,8 +10,11 @@ from pathlib import Path
 # Update this path if you want the script to target a different text file.
 INPUT_FILE = Path("/Users/taozeng/Documents/Membership Stat/PRT Alight 20260127.txt")
 
-# Update this path if you want the combined CSV file saved somewhere else.
-OUTPUT_FILE = Path("/Users/taozeng/Documents/Membership Stat/text_file_statistics.csv")
+# Update this path if you want the CSV files saved somewhere else.
+OUTPUT_DIR = Path("/Users/taozeng/Documents/Membership Stat")
+
+# Update this prefix if you want different CSV filenames.
+OUTPUT_PREFIX = "text_file_statistics"
 
 NULL_VALUES = {"", "NULL", "null", None}
 
@@ -54,8 +57,8 @@ def calculate_age_years(birth_date: date, as_of_date: date) -> float:
 
 def resolve_paths() -> tuple[Path, Path]:
     input_path = Path(sys.argv[1]).expanduser() if len(sys.argv) > 1 else INPUT_FILE
-    output_file = Path(sys.argv[2]).expanduser() if len(sys.argv) > 2 else OUTPUT_FILE
-    return input_path, output_file
+    output_dir = Path(sys.argv[2]).expanduser() if len(sys.argv) > 2 else OUTPUT_DIR
+    return input_path, output_dir
 
 
 def build_payload(input_path: Path) -> dict[str, object]:
@@ -164,8 +167,8 @@ def write_csv(output_path: Path, fieldnames: list[str], rows: list[dict[str, obj
             writer.writerow(row)
 
 
-def export_csv_file(payload: dict[str, object], output_file: Path) -> Path:
-    output_file.parent.mkdir(parents=True, exist_ok=True)
+def export_csv_files(payload: dict[str, object], output_dir: Path) -> list[Path]:
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     metadata = payload["metadata"]
     summary_rows = payload["summary_rows"]
@@ -173,153 +176,57 @@ def export_csv_file(payload: dict[str, object], output_file: Path) -> Path:
     gender_rows = payload["gender_rows"]
     benefit_rows = payload["benefit_rows"]
     age_rows = payload["age_rows"]
-    combined_rows: list[dict[str, object]] = []
 
-    combined_rows.append(
-        {
-            "report_section": "metadata",
-            "gac_number": "",
-            "category": "",
-            "category_value": "",
-            "count": "",
-            "average_benefit": "",
-            "average_age": "",
-            "record_count": "",
-            "total_records": metadata["total_records"],
-            "distinct_statuses": "",
-            "distinct_genders": "",
-            "input_file": metadata["input_file"],
-            "generated_at": metadata["generated_at"],
-            "gac_count": metadata["gac_count"],
-        }
-    )
+    output_files = [
+        (
+            output_dir / f"{OUTPUT_PREFIX}_summary.csv",
+            [
+                "gac_number",
+                "total_records",
+                "distinct_statuses",
+                "distinct_genders",
+                "average_benefit",
+                "benefit_record_count",
+                "average_age",
+                "age_record_count",
+            ],
+            summary_rows,
+        ),
+        (
+            output_dir / f"{OUTPUT_PREFIX}_status_counts.csv",
+            ["gac_number", "status", "count"],
+            status_rows,
+        ),
+        (
+            output_dir / f"{OUTPUT_PREFIX}_gender_counts.csv",
+            ["gac_number", "gender", "count"],
+            gender_rows,
+        ),
+        (
+            output_dir / f"{OUTPUT_PREFIX}_average_benefit.csv",
+            ["gac_number", "average_benefit", "record_count"],
+            benefit_rows,
+        ),
+        (
+            output_dir / f"{OUTPUT_PREFIX}_average_age.csv",
+            ["gac_number", "average_age", "record_count"],
+            age_rows,
+        ),
+        (
+            output_dir / f"{OUTPUT_PREFIX}_metadata.csv",
+            ["input_file", "generated_at", "total_records", "gac_count"],
+            [metadata],
+        ),
+    ]
 
-    for row in summary_rows:
-        combined_rows.append(
-            {
-                "report_section": "summary",
-                "gac_number": row["gac_number"],
-                "category": "",
-                "category_value": "",
-                "count": "",
-                "average_benefit": row["average_benefit"],
-                "average_age": row["average_age"],
-                "record_count": "",
-                "total_records": row["total_records"],
-                "distinct_statuses": row["distinct_statuses"],
-                "distinct_genders": row["distinct_genders"],
-                "input_file": metadata["input_file"],
-                "generated_at": metadata["generated_at"],
-                "gac_count": "",
-            }
-        )
+    for output_path, fieldnames, rows in output_files:
+        write_csv(output_path, fieldnames, rows)
 
-    for row in status_rows:
-        combined_rows.append(
-            {
-                "report_section": "status_count",
-                "gac_number": row["gac_number"],
-                "category": "status",
-                "category_value": row["status"],
-                "count": row["count"],
-                "average_benefit": "",
-                "average_age": "",
-                "record_count": "",
-                "total_records": "",
-                "distinct_statuses": "",
-                "distinct_genders": "",
-                "input_file": metadata["input_file"],
-                "generated_at": metadata["generated_at"],
-                "gac_count": "",
-            }
-        )
-
-    for row in gender_rows:
-        combined_rows.append(
-            {
-                "report_section": "gender_count",
-                "gac_number": row["gac_number"],
-                "category": "gender",
-                "category_value": row["gender"],
-                "count": row["count"],
-                "average_benefit": "",
-                "average_age": "",
-                "record_count": "",
-                "total_records": "",
-                "distinct_statuses": "",
-                "distinct_genders": "",
-                "input_file": metadata["input_file"],
-                "generated_at": metadata["generated_at"],
-                "gac_count": "",
-            }
-        )
-
-    for row in benefit_rows:
-        combined_rows.append(
-            {
-                "report_section": "average_benefit",
-                "gac_number": row["gac_number"],
-                "category": "",
-                "category_value": "",
-                "count": "",
-                "average_benefit": row["average_benefit"],
-                "average_age": "",
-                "record_count": row["record_count"],
-                "total_records": "",
-                "distinct_statuses": "",
-                "distinct_genders": "",
-                "input_file": metadata["input_file"],
-                "generated_at": metadata["generated_at"],
-                "gac_count": "",
-            }
-        )
-
-    for row in age_rows:
-        combined_rows.append(
-            {
-                "report_section": "average_age",
-                "gac_number": row["gac_number"],
-                "category": "",
-                "category_value": "",
-                "count": "",
-                "average_benefit": "",
-                "average_age": row["average_age"],
-                "record_count": row["record_count"],
-                "total_records": "",
-                "distinct_statuses": "",
-                "distinct_genders": "",
-                "input_file": metadata["input_file"],
-                "generated_at": metadata["generated_at"],
-                "gac_count": "",
-            }
-        )
-
-    write_csv(
-        output_file,
-        [
-            "report_section",
-            "gac_number",
-            "category",
-            "category_value",
-            "count",
-            "average_benefit",
-            "average_age",
-            "record_count",
-            "total_records",
-            "distinct_statuses",
-            "distinct_genders",
-            "input_file",
-            "generated_at",
-            "gac_count",
-        ],
-        combined_rows,
-    )
-
-    return output_file
+    return [item[0] for item in output_files]
 
 
 def main() -> None:
-    input_path, output_file = resolve_paths()
+    input_path, output_dir = resolve_paths()
 
     if not input_path.exists():
         raise FileNotFoundError(
@@ -328,10 +235,12 @@ def main() -> None:
         )
 
     payload = build_payload(input_path)
-    created_file = export_csv_file(payload, output_file)
+    output_files = export_csv_files(payload, output_dir)
 
     print(f"Input file path: {input_path}")
-    print(f"CSV output path: {created_file}")
+    print(f"CSV output folder: {output_dir}")
+    for output_file in output_files:
+        print(f"Created: {output_file}")
 
 
 if __name__ == "__main__":
